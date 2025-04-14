@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package="./main";
+
+message Product {
+    string Name = 1;
+    string Description = 2;
+    float BasePrice = 3;
+    string Currency = 4;
+    string Color = 5;
+    repeated Product Variations = 6;
+    bytes Image = 7;
+}

@@ -1,0 +1,26 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.2'
+      - name: Download wasm_exec.js and go_js_wasm_exec
+        run: |
+          curl -sSL https://raw.githubusercontent.com/golang/go/$(go version | awk '{print $3}')/misc/wasm/wasm_exec.js -o wasm_exec_node.js
+          curl -sSL https://raw.githubusercontent.com/golang/go/$(go version | awk '{print $3}')/misc/wasm/go_js_wasm_exec -o go_js_wasm_exec
+          chmod +x go_js_wasm_exec
+
+      - name: Run Go WASM tests
+        run: |
+          GOOS=js GOARCH=wasm go test -v -cover ./... -exec=./go_js_wasm_exec
