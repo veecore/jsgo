@@ -457,9 +457,9 @@ func CopyObject(dst, src js.Value) (err error) {
 	return nil
 }
 
-func CopyObjectWithMethods(dst, src js.Value) (err error) {
-	panic("CopyObjectWithMethods unimplemented")
-}
+// func CopyObjectWithMethods(dst, src js.Value) (err error) {
+// 	panic("CopyObjectWithMethods unimplemented")
+// }
 
 func TypeJSParallel[T any]() js.Type {
 	return typeJSParallel(reflect.TypeFor[T]())
