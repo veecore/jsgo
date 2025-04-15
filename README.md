@@ -1,4 +1,6 @@
 # jsgo - Seamless Go/JavaScript Interop 🚀
+[![Go Reference](https://pkg.go.dev/badge/github.com/veecore/jsgo.svg)](https://pkg.go.dev/github.com/yourusername/jsgo)
+[![Tests](https://github.com/veecore/jsgo/actions/workflows/go.yml/badge.svg)](https://github.com/yourusername/jsgo/actions)
 
 **Production-Grade Go/JavaScript Type Conversion** - The missing bridge for complex Go/WebAssembly applications
 
