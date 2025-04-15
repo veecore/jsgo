@@ -11,6 +11,23 @@ import (
 	"syscall/js"
 )
 
+// Unmarshaler is the interface implemented by types that can decode themselves
+// from JavaScript values. Use for custom validation/parsing.
+//
+// Example:
+//
+//	type Account struct{ Balance float64 }
+//	func (a *Account) UnmarshalJS(v js.Value) error {
+//	    if v.Type() != js.TypeObject {
+//	        return errors.New("must be object")
+//	    }
+//	    a.Balance = v.Get("balance").Float()
+//	    return nil
+//	}
+type Unmarshaler interface {
+	UnmarshalJS(v js.Value) error
+}
+
 // Unmarshal populates Go values from JavaScript values with strict type checking.
 //
 //	similar to JSON unmarshaling.
@@ -49,23 +66,6 @@ func Unmarshal(jsVal js.Value, goVal any) error {
 		return fmt.Errorf("jsgo: %w", err)
 	}
 	return nil
-}
-
-// Unmarshaler is the interface implemented by types that can decode themselves
-// from JavaScript values. Use for custom validation/parsing.
-//
-// Example:
-//
-//	type Account struct{ Balance float64 }
-//	func (a *Account) UnmarshalJS(v js.Value) error {
-//	    if v.Type() != js.TypeObject {
-//	        return errors.New("must be object")
-//	    }
-//	    a.Balance = v.Get("balance").Float()
-//	    return nil
-//	}
-type Unmarshaler interface {
-	UnmarshalJS(v js.Value) error
 }
 
 var jsValueType = reflect.TypeFor[js.Value]()
@@ -291,13 +291,13 @@ func errTypeMismatch(jsType js.Type, goType reflect.Type) error {
 	return fmt.Errorf("type mismatch: cannot unmarshal js %v into go type %v", jsType, goType)
 }
 
-type Number interface {
+type number interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
 		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
 		~float32 | ~float64
 }
 
-func errOverflow[T Number](v T, t reflect.Type) error {
+func errOverflow[T number](v T, t reflect.Type) error {
 	return fmt.Errorf("%v overflows %v", v, t)
 }
 

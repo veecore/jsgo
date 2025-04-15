@@ -1,23 +1,3 @@
-// Package jsgo provides bi-directional conversion between Go values and JavaScript
-// values with extended type support beyond basic JSON marshaling. It handles:
-//
-// - Complex types (time.Time, big.Int)
-// - Function conversion between Go/JS
-// - Struct tags for field control
-// - Cyclic reference detection
-// - Pooled memory management for high performance
-//
-// # Security Considerations
-//
-// When passing functions between Go and JS:
-// 1. Validate all JS callback arguments
-// 2. Never expose internal system functions
-//
-// Tags Examples:
-// `jsgo:"-"` (or `jsgo:"_"`)          - ignore field
-// `jsgo:"fieldName"`                  - custom JS property name
-// `jsgo:",omitmempty"`
-// `jsgo:",extends=BaseClass"`         - inheritance specification
 package jsgo
 
 import (
@@ -42,9 +22,9 @@ type Marshaler interface {
 	MarshalJS() (js.Value, error)
 }
 
-// MarshalerInto is like Marshaler but for reference types.
-// A type only needs to implement this to also "implicitly"
-// implement Marshaler
+// MarshalerInto allows certain types(types have jsgo.TypeJSParallel[T]() == js.TypeObject)
+// to marshal into existing JS values.
+// Implementing this interface provides both MarshalJS and MarshalIntoJS capabilities.
 //
 // Example:
 //
@@ -75,7 +55,6 @@ type MarshalerInto interface {
 //	jsVal, err := Marshal(u) // Returns JS object {username: "Alice"}
 //
 // Gotchas:
-// - Modified function arguments won't propagate back to JS
 // - Cyclic structures return error
 // - Channels are not supported
 func Marshal(goVal any) (js.Value, error) {
@@ -86,10 +65,35 @@ func Marshal(goVal any) (js.Value, error) {
 		marshalContextPool.Put(ctx)
 	}()
 	rVal := reflect.ValueOf(goVal)
-	return getTypeEncoder(rVal.Type())(ctx, rVal)
+	v, err := getTypeEncoder(rVal.Type())(ctx, rVal)
+	if err != nil {
+		return js.Value{}, fmt.Errorf("jsgo: %w", err)
+	}
+	return v, nil
 }
 
-// jsVal has to be a reference type (Object)
+// MarshalInto is like Marshal buf jsVal has to be a reference type (Object)
+
+// MarshalInto marshals a Go value into an existing JavaScript reference type
+// (Object). More efficient than Marshal for repeated operations
+// as it reuses JS containers instead of creating new ones.
+//
+// Parameters:
+//   - jsVal: Must be a JS reference type (Object, Array, TypedArray)
+//   - goVal: Go value to marshal (struct, map, slice, etc)
+//
+// Returns:
+//   - error if marshaling fails (cyclic ref, unsupported type, etc)
+//
+// Example:
+//
+//	jsObj := js.Global().Get("Object").New()
+//	err := MarshalInto(jsObj, myStruct)
+//	jsObj.Call("someMethod")
+//
+// Notes:
+//   - Prefer for hot paths where JS object reuse matters
+//   - Does not clear existing properties
 func MarshalInto(jsVal js.Value, goVal any) error {
 	ctx := marshalContextPool.Get().(*contextM)
 	defer func() {
@@ -98,7 +102,10 @@ func MarshalInto(jsVal js.Value, goVal any) error {
 		marshalContextPool.Put(ctx)
 	}()
 	rVal := reflect.ValueOf(goVal)
-	return getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal)
+	if err := getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err !=nil {
+		return fmt.Errorf("jsgo: %w", err)	
+	}
+	return nil
 }
 
 var marshalContextPool = sync.Pool{
@@ -461,7 +468,7 @@ func interfaceEncoderInto(ctx *contextM, jsVal js.Value, rVal reflect.Value) err
 		return getTypeEncoderInto(rVal.Elem().Type())(ctx, jsVal, rVal.Elem())
 	}
 
-	return fmt.Errorf("jsgo: cannot MarshalInto js value from non \"Object\" go type: %v", rVal.Type())
+	return fmt.Errorf("cannot MarshalInto js value from non \"Object\" go type: %v", rVal.Type())
 }
 
 func prepareStructEncoderInto(t reflect.Type) encodeIntoFunc {
@@ -960,7 +967,11 @@ func marshalRVal(rVal reflect.Value) (js.Value, error) {
 		clear(ctx.seen)
 		marshalContextPool.Put(ctx)
 	}()
-	return getTypeEncoder(rVal.Type())(ctx, rVal)
+	v, err := getTypeEncoder(rVal.Type())(ctx, rVal)
+	if err != nil {
+		return js.Value{}, fmt.Errorf("jsgo: %w", err)
+	}
+	return v, nil
 }
 
 func marshalIntoRVal(jsVal js.Value, rVal reflect.Value) error {
@@ -970,5 +981,8 @@ func marshalIntoRVal(jsVal js.Value, rVal reflect.Value) error {
 		clear(ctx.seen)
 		marshalContextPool.Put(ctx)
 	}()
-	return getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal)
+	if err:=getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err != nil {
+		return fmt.Errorf("jsgo: %w", err)	
+	}
+	return nil
 }

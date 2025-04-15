@@ -8,7 +8,7 @@ import (
 )
 
 // FuncOfAny wraps Go functions into JS functions with automatic type conversion.
-// Supported variadic functions:
+// Supports variadic functions and handles error propagation.
 //
 // Example:
 //
@@ -16,13 +16,7 @@ import (
 //	js.Global().Set("double", jsFunc)
 //	defer jsFunc.Release()
 //
-// # Critical Caveats
-//
-//  1. Argument modification doesn't affect JS side:
-//     func mutate(x *int) { *x++ } // JS side won't see changes
-//
-// 2. Returned values are copies
-// 3. Functions retain Go context - ensure proper cleanup with Release()
+// Note: Argument modifications won't affect JS side and returned values are copies.
 func FuncOfAny(f any) js.Func {
 	rVal := reflect.ValueOf(f)
 	if rVal.Kind() != reflect.Func {
@@ -35,6 +29,9 @@ func FuncOfAny(f any) js.Func {
 	return js.FuncOf(fa)
 }
 
+// FuncOf provides a safer and more ergonomic alternative to js.FuncOf with automatic error handling.
+// Converts Go errors to JS exceptions automatically.
+// Return types are not limited unlike js.FuncOf
 func FuncOf(f func(this js.Value, jsArgs []js.Value) interface{}) js.Func {
 	return js.FuncOf(func(this js.Value, jsArgs []js.Value) interface{} {
 		result := f(this, jsArgs)

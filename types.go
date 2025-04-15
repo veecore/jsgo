@@ -48,11 +48,14 @@ func TypeFor[T any](constructor any) (Class, error) {
 	return typeFor(reflect.TypeFor[T](), constructor)
 }
 
+// Class represents a JavaScript class with its constructor and methods.
+// Use Release() to clean up resources when done
 type Class struct {
 	Constructor js.Func
 	Methods     map[string]js.Func
 }
 
+// Release cleans up all JS resources associated with the class.
 func (c Class) Release() {
 	for _, m := range c.Methods {
 		m.Release()
@@ -70,11 +73,15 @@ type ConstructorConfig struct {
 	SuperArgs func([]js.Value) []js.Value
 }
 
+// ExportGoType exports a Go type as a JavaScript class with automatic resource management.
+// Returns a cleanup function that should be called when the class is no longer needed.
 func ExportGoType[T any](constructor any) (release func(), err error) {
 	_type := reflect.TypeFor[T]()
 	return exportGoType(_type, constructor, _type.Name())
 }
 
+// ExportGoTypeWithName exports a Go type with a custom JavaScript class name.
+// Useful for renaming types in the JS environment.
 func ExportGoTypeWithName[T any](constructor any, name string) (release func(), err error) {
 	return exportGoType(reflect.TypeFor[T](), constructor, name)
 }
@@ -319,16 +326,17 @@ func isOrPtr(t, to reflect.Type, depth int) bool {
 	return t == to
 }
 
-// New creates JavaScript objects from their global constructor names.
+// New creates a JavaScript object using the specified constructor.
 // Equivalent to `new ConstructorName(...args)` in JavaScript.
 //
 // Example:
 //
-//	array := jsgo.New("Array", 10) // Creates new Array(10)
-func New(name string, constructor ...any) js.Value {
-	return Type(name).New(constructor...)
+//	arr := jsgo.New("Array", 10) // Creates new Array(10)
+func New(name string, args ...any) js.Value {
+	return Type(name).New(args...)
 }
 
+// Type returns the JavaScript constructor for the given global name.
 func Type(name string) js.Value {
 	return js.Global().Get(name)
 }
@@ -343,7 +351,7 @@ var (
 	arrayProto           = jsArray.Get("prototype")
 	objectPrototypeOf    = jsObject.Get("getPrototypeOf")
 	objectSetPrototypeOf = jsObject.Get("setPrototypeOf")
-	ObjectKeysFn         = jsObject.Get("keys")
+	objectKeysFn         = jsObject.Get("keys")
 )
 
 func NewObject() js.Value {
@@ -413,14 +421,15 @@ func Bytes(b []byte) js.Value {
 // Note: Splitting by commas is unsafe in general but may be acceptable
 // if keys are guaranteed not to contain commas (e.g., struct field names).
 func objectKeysGoField(v js.Value) []string {
-	keysObj := ObjectKeysFn.Invoke(v)        // 1 syscall
+	keysObj := objectKeysFn.Invoke(v)        // 1 syscall
 	str := keysObj.Call("toString").String() // 2 syscall
 	// This is safe because go fields cannot have ","
 	return strings.Split(str, ",")
 }
 
+// ObjectKeys returns the enumerable own properties of a JS object.
 func ObjectKeys(v js.Value) []string {
-	fs := ObjectKeysFn.Invoke(v)
+	fs := objectKeysFn.Invoke(v)
 	keys := make([]string, fs.Length())
 	for i := 0; i < len(keys); i++ { // len(keys) syscalls
 		keys[i] = fs.Index(i).String()
@@ -561,7 +570,5 @@ var (
 //	    return result
 //	})
 func Throw(err error) js.Value {
-	// goStack := debug.Stack()
-	// message := fmt.Sprintf("%s\n\nGo Stack Trace:\n%s", err.Error(), string(goStack))
 	return errorConstructor.New(err.Error())
 }

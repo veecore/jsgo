@@ -263,10 +263,6 @@ func (w *visibleFieldsWalker) walk(t reflect.Type) {
 	delete(w.visiting, t)
 }
 
-func GetOrFillField(v reflect.Value, index []int) (reflect.Value, error) {
-	return getOrFillField(v, index)
-}
-
 func getOrFillField(v reflect.Value, index []int) (reflect.Value, error) {
 	if len(index) == 1 {
 		return v.Field(index[0]), nil
