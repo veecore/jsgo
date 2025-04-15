@@ -474,7 +474,18 @@ func TypeJSParallel[T any]() js.Type {
 	return typeJSParallel(reflect.TypeFor[T]())
 }
 
+// TODO: Since we specially handle js.Value, the typeJSParallel of
+// a js.Value should be the js.Value.Type() which we need a concrete
+// value to tell. For now, we use Undefined so we don't treat the js.Value
+// as a struct
 func typeJSParallel(t reflect.Type) js.Type {
+	if t == jsValueType {
+		return js.TypeUndefined
+	}
+	if t == jsFuncType {
+		return js.TypeFunction
+	}
+
 	for {
 		switch t.Kind() {
 		case reflect.Array, reflect.Struct, reflect.Slice, reflect.Map:

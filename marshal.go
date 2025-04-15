@@ -102,8 +102,8 @@ func MarshalInto(jsVal js.Value, goVal any) error {
 		marshalContextPool.Put(ctx)
 	}()
 	rVal := reflect.ValueOf(goVal)
-	if err := getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err !=nil {
-		return fmt.Errorf("jsgo: %w", err)	
+	if err := getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err != nil {
+		return fmt.Errorf("jsgo: %w", err)
 	}
 	return nil
 }
@@ -176,59 +176,56 @@ func getTypeEncoder(t reflect.Type) (enc encoderFunc) {
 			// we're the entry point for both of us
 			switch enci := cached.(type) {
 			case encodeIntoFunc:
-				enc = enci.intoEncode(t)
+				return enci.intoEncode(t)
 			case encoderFunc:
-				enc = enci
+				return enci
 			case funcInnerEncoderFunc:
-				enc = enci.intoEncode()
+				return enci.intoEncode()
 			default:
 				panic(fmt.Sprintf("%T", enc))
 			}
 			return
 		}
 
+		// Handle js.Value directly without processing
+		if t == jsValueType {
+			return jsValueEnc
+		}
+		if t == jsFuncType {
+			return jsFuncEnc
+		}
+
 		if t.Implements(marshalerType) {
-			enc = marshalerEncoder
-			return
+			return marshalerEncoder
 		}
 
 		// We could have a valid marshalerInto here which we could
 		// convert to a encoderFunc
 		// we use typeJSParallelNoIndirect so it doesn't follow the pointer
 		if t.Implements(marshalerIntoType) && typeJSParallelNoIndirect(t) == js.TypeObject {
-			enc = encodeIntoFunc(marshalerIntoEncoder).intoEncode(t)
-			return
+			return encodeIntoFunc(marshalerIntoEncoder).intoEncode(t)
 		}
 
 		if marshaler, ok := isCanonMarshal(t); ok {
-			enc = marshaler
-			return
-		}
-
-		// Handle js.Value directly without processing
-		if t == jsValueType {
-			enc = jsValueEnc
-			return
+			return marshaler
 		}
 
 		switch t.Kind() {
 		case reflect.Func:
 			// We cache the inner func so we can create this as needed
 			// this wouldn't be possible otherwise
-			enc = getFuncTypeEncoder(t)
+			return getFuncTypeEncoder(t)
 		case reflect.Pointer:
 			ptr_depth++
 			t = t.Elem()
 			continue
 		case reflect.Interface:
-			enc = interfaceEncoder
-			return
+			return interfaceEncoder
 		}
 
 		// not our work...
 		if jsT := typeJSParallel(t); jsT == js.TypeObject {
-			enc = getTypeEncoderInto(t).intoEncode(t)
-			return
+			return getTypeEncoderInto(t).intoEncode(t)
 		}
 
 		// To prevent redundant work during race
@@ -249,8 +246,7 @@ func getTypeEncoder(t reflect.Type) (enc encoderFunc) {
 			return enc(ctx, r)
 		}))
 		if loaded {
-			enc = fi.(encoderFunc)
-			return
+			return fi.(encoderFunc)
 		}
 
 		// Compute the real encoder and replace the indirect func with it.
@@ -285,6 +281,12 @@ func getTypeEncoderInto(t reflect.Type) (encInto encodeIntoFunc) {
 			return
 		}
 
+		// Handle js.Value directly without processing
+		if t == jsValueType {
+			encInto = jsValueEncInto
+			return
+		}
+
 		// We don't regard inappropriate implementations
 		if t.Implements(marshalerIntoType) && typeJSParallel(t) == js.TypeObject {
 			encInto = marshalerIntoEncoder
@@ -293,12 +295,6 @@ func getTypeEncoderInto(t reflect.Type) (encInto encodeIntoFunc) {
 
 		if marshalerInto, ok := isCanonMarshalInto(t); ok {
 			encInto = marshalerInto
-			return
-		}
-
-		// Handle js.Value directly without processing
-		if t == jsValueType {
-			encInto = jsValueEncInto
 			return
 		}
 
@@ -368,6 +364,10 @@ func jsValueEncInto(ctx *contextM, jsVal js.Value, rVal reflect.Value) error {
 		return fmt.Errorf("cannot MarshalInto non-reference js type: %v", jsVal.Type())
 	}
 	return CopyObject(jsVal, rVal.Interface().(js.Value))
+}
+
+func jsFuncEnc(ctx *contextM, rVal reflect.Value) (js.Value, error) {
+	return rVal.Interface().(js.Func).Value, nil
 }
 
 func marshalerIntoEncoder(ctx *contextM, jsVal js.Value, rVal reflect.Value) error {
@@ -981,8 +981,8 @@ func marshalIntoRVal(jsVal js.Value, rVal reflect.Value) error {
 		clear(ctx.seen)
 		marshalContextPool.Put(ctx)
 	}()
-	if err:=getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err != nil {
-		return fmt.Errorf("jsgo: %w", err)	
+	if err := getTypeEncoderInto(rVal.Type())(ctx, jsVal, rVal); err != nil {
+		return fmt.Errorf("jsgo: %w", err)
 	}
 	return nil
 }

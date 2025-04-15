@@ -69,6 +69,7 @@ func Unmarshal(jsVal js.Value, goVal any) error {
 }
 
 var jsValueType = reflect.TypeFor[js.Value]()
+var jsFuncType = reflect.TypeFor[js.Func]()
 var jsValueTypePtr = reflect.TypeFor[*js.Value]()
 
 func unmarshal(ctx *contextU, jsVal js.Value, goVal reflect.Value) error {
@@ -280,12 +281,26 @@ func unmarshal(ctx *contextU, jsVal js.Value, goVal reflect.Value) error {
 		}
 	case js.TypeUndefined:
 		return fmt.Errorf("js value is undefined. want go type %v", goVal.Type())
+	case js.TypeFunction:
+		if (goVal.Kind() == reflect.Interface && goVal.NumMethod() == 0) || goVal.Type() == jsFuncAble {
+			goVal.Set(reflect.ValueOf(jsVal.Invoke))
+			return nil
+		}
+		return fmt.Errorf("js Func to go is only supported for any or func(...any) js.Value receiver")
 	default:
 		// This could also be js.TypeFunc to go func which can't be handled
 		return errTypeMismatch(jsValType, goVal.Type())
 	}
 	return nil
 }
+
+var jsFuncAble = reflect.TypeFor[func(...any) js.Value]()
+
+// func jsFuncToGo(f js.Value) func(...js.v) js.Value {
+// 	return func(args ...any) any {
+// 		return f.Invoke(args...)
+// 	}
+// }
 
 func errTypeMismatch(jsType js.Type, goType reflect.Type) error {
 	return fmt.Errorf("type mismatch: cannot unmarshal js %v into go type %v", jsType, goType)
