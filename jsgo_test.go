@@ -682,7 +682,6 @@ func (m *MethodStruct) unexported()      {} // Should not be exposed
 
 // TestMethodExport tests method exposure
 func TestMethodExport(t *testing.T) {
-
 	t.Run("method availability", func(t *testing.T) {
 		release, err := jsgo.ExportGoTypeWithName[*MethodStruct](
 			nil,
@@ -707,16 +706,16 @@ func TestMethodExport(t *testing.T) {
 
 // TestErrorHandling tests various error scenarios
 func TestErrorHandling(t *testing.T) {
-	// t.Run("invalid type", func(t *testing.T) {
-	// 	_, err := jsgo.ExportGoTypeWithName[[]chan struct{}](
-	// 		nil,
-	// 		"InvalidClass",
-	// 	)
+	t.Run("invalid type", func(t *testing.T) {
+		_, err := jsgo.ExportGoTypeWithName[[]chan struct{}](
+			nil,
+			"InvalidClass",
+		)
 
-	// 	if err == nil {
-	// 		t.Error("Expected error for invalid type")
-	// 	}
-	// })
+		if err == nil {
+			t.Error("Expected error for invalid type")
+		}
+	})
 
 	t.Run("empty name", func(t *testing.T) {
 		_, err := jsgo.ExportGoTypeWithName[struct{}](

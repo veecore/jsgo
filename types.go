@@ -172,6 +172,9 @@ func typeFor(_type reflect.Type, constructor any) (class Class, err error) {
 	} else {
 		// Default constructor
 		jsCtorFunc = func(this js.Value, args []js.Value) any {
+			if err := marshalIntoRVal(this, reflect.Zero(_type)); err != nil {
+				return Throw(err)
+			}
 			return this
 		}
 	}
